@@ -1,0 +1,22 @@
+{
+  "name": "PathSense - Voice Object Detection",
+  "short_name": "PathSense",
+  "description": "Voice-guided object detection to help visually impaired users navigate their surroundings.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
