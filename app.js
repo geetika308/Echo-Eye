@@ -1,6 +1,7 @@
-// ===== PathSense: Voice-guided object detection =====
+// ===== Echo-Eye: Voice-guided object detection =====
 // This file handles: camera access, running the AI model,
-// figuring out object position, and speaking results out loud.
+// figuring out object position, and speaking results out loud
+// in the user's chosen language.
 
 const appButton = document.getElementById('app-button');
 const video = document.getElementById('video');
@@ -11,23 +12,24 @@ const startOverlay = document.getElementById('start-overlay');
 const lastDetectionBox = document.getElementById('last-detection');
 const detectionText = document.getElementById('detection-text');
 const liveAnnouncer = document.getElementById('live-announcer');
+const langButtons = document.querySelectorAll('.lang-btn');
 
 let model = null;
 let running = false;
 let lastSpokenAt = 0;
 let lastSpokenLabel = '';
+let currentLang = 'en'; // default language until the user picks one
 const SPEAK_COOLDOWN_MS = 2500; // don't repeat the same object too often
 
 // ---- Speech ----
 function speak(text) {
-  // Cancel anything currently being said so we don't queue up a backlog
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 1.05;
+  utterance.lang = TRANSLATIONS[currentLang].speechLang;
+  utterance.rate = 1.0;
   utterance.pitch = 1;
   window.speechSynthesis.speak(utterance);
 
-  // Also push to the ARIA live region for screen reader users
   liveAnnouncer.textContent = text;
   detectionText.textContent = text;
   lastDetectionBox.classList.remove('hidden');
@@ -39,8 +41,8 @@ function getPosition(bbox, videoWidth) {
   const centerX = x + boxWidth / 2;
   const third = videoWidth / 3;
 
-  if (centerX < third) return 'on your left';
-  if (centerX > third * 2) return 'on your right';
+  if (centerX < third) return 'left';
+  if (centerX > third * 2) return 'right';
   return 'ahead';
 }
 
@@ -49,7 +51,7 @@ function getProximity(bbox, videoWidth, videoHeight) {
   const [, , boxWidth, boxHeight] = bbox;
   const areaRatio = (boxWidth * boxHeight) / (videoWidth * videoHeight);
 
-  if (areaRatio > 0.35) return 'very close';
+  if (areaRatio > 0.35) return 'veryClose';
   if (areaRatio > 0.15) return 'close';
   return '';
 }
@@ -57,7 +59,7 @@ function getProximity(bbox, videoWidth, videoHeight) {
 // ---- Camera setup ----
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: 'environment' }, // rear camera
+    video: { facingMode: 'environment' },
     audio: false
   });
   video.srcObject = stream;
@@ -93,7 +95,6 @@ async function detectFrame() {
   drawDetections(predictions);
 
   if (predictions.length > 0) {
-    // Pick the most confident detection to announce
     const best = predictions.reduce((a, b) => (a.score > b.score ? a : b));
     const position = getPosition(best.bbox, video.videoWidth);
     const proximity = getProximity(best.bbox, video.videoWidth, video.videoHeight);
@@ -102,11 +103,8 @@ async function detectFrame() {
     const sameAsLast = best.class === lastSpokenLabel;
     const cooldownPassed = now - lastSpokenAt > SPEAK_COOLDOWN_MS;
 
-    // Speak if it's a new object, or cooldown passed for a repeated one
     if (!sameAsLast || cooldownPassed) {
-      const phrase = proximity
-        ? `${best.class} ${proximity}, ${position}`
-        : `${best.class} ${position}`;
+      const phrase = buildPhrase(currentLang, best.class, position, proximity);
       speak(phrase);
       lastSpokenAt = now;
       lastSpokenLabel = best.class;
@@ -116,44 +114,63 @@ async function detectFrame() {
   requestAnimationFrame(detectFrame);
 }
 
-// ---- Start flow (triggered by tapping anywhere) ----
+// ---- Start flow (triggered by tapping anywhere, after language is picked) ----
 async function start() {
   if (running) return;
 
+  const t = TRANSLATIONS[currentLang].phrases;
   statusText.textContent = 'Starting camera...';
 
   try {
     await startCamera();
   } catch (err) {
     statusText.textContent = 'Camera access denied or unavailable.';
-    speak('Camera access is needed for this app to work. Please allow camera permission.');
+    speak(t.needCamera);
     return;
   }
 
-  statusText.textContent = 'Loading detection model...';
-  speak('Loading. Please wait.');
+  statusText.textContent = t.loading;
+  speak(t.loading);
 
   if (!model) {
     model = await cocoSsd.load();
   }
 
   startOverlay.classList.add('hidden');
-  statusText.textContent = 'Detecting - tap to stop';
+  statusText.textContent = t.detectingTapToStop;
   running = true;
-  speak('Ready. Detection started.');
+  speak(t.ready);
 
   detectFrame();
 }
 
 function stop() {
+  const t = TRANSLATIONS[currentLang].phrases;
   running = false;
-  statusText.textContent = 'Tap anywhere to start';
+  statusText.textContent = t.tapToStart;
   startOverlay.classList.remove('hidden');
   window.speechSynthesis.cancel();
-  speak('Detection stopped.');
+  speak(t.stopped);
 }
 
-appButton.addEventListener('click', () => {
+// ---- Language selection ----
+langButtons.forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation(); // don't let this tap also trigger the start button
+    currentLang = btn.dataset.lang;
+
+    langButtons.forEach(b => b.classList.remove('lang-selected'));
+    btn.classList.add('lang-selected');
+
+    statusText.textContent = TRANSLATIONS[currentLang].phrases.tapToStart;
+    speak(TRANSLATIONS[currentLang].langName);
+  });
+});
+
+appButton.addEventListener('click', (e) => {
+  // Ignore taps that landed on a language button (handled above)
+  if (e.target.closest('.lang-btn')) return;
+
   if (running) {
     stop();
   } else {

@@ -1,6 +1,6 @@
 {
-  "name": "PathSense - Voice Object Detection",
-  "short_name": "PathSense",
+  "name": "Echo-Eye - Voice Object Detection",
+  "short_name": "Echo-Eye",
   "description": "Voice-guided object detection to help visually impaired users navigate their surroundings.",
   "start_url": "./index.html",
   "display": "fullscreen",

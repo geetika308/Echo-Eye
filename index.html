@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>PathSense - Voice Object Detection</title>
+<title>Echo-Eye - Voice Object Detection</title>
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0a0a0a" />
 <style>
@@ -106,6 +106,31 @@
     font-size: 18px;
     color: #ccc;
     line-height: 1.5;
+    margin-bottom: 30px;
+  }
+
+  #lang-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .lang-btn {
+    font-size: 20px;
+    font-weight: 600;
+    padding: 16px;
+    border-radius: 12px;
+    border: 2px solid #444;
+    background: #111;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .lang-btn.lang-selected {
+    border-color: #00ff9d;
+    background: #003322;
   }
 
   .hidden { display: none !important; }
@@ -136,8 +161,12 @@
   </div>
 
   <div id="start-overlay">
-    <h1>PathSense</h1>
-    <p>Tap anywhere on the screen<br/>to start voice-guided object detection.</p>
+    <h1>Echo-Eye</h1>
+    <p>Choose a language, then tap anywhere<br/>to start voice-guided object detection.</p>
+    <div id="lang-picker">
+      <button class="lang-btn lang-selected" data-lang="en" aria-label="English">English</button>
+      <button class="lang-btn" data-lang="hi" aria-label="Hindi">हिन्दी (Hindi)</button>
+    </div>
   </div>
 
   <div id="live-announcer" class="sr-only" aria-live="assertive" role="status"></div>
@@ -146,6 +175,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="translations.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,14 +1,19 @@
-# PathSense — Voice-Guided Object Detection for the Visually Impaired
+# Echo-Eye — Voice-Guided Object Detection for the Visually Impaired
 
 A browser-based, installable web app that helps visually impaired users understand their surroundings by speaking out loud what the camera sees — including roughly *where* it is and *how close*.
 
 ## How it works
 
-1. Tap anywhere on the screen to start (the entire screen is one giant tap target — no fiddly buttons).
-2. The app asks for camera access and starts the rear camera.
-3. A pre-trained AI model ([COCO-SSD](https://github.com/tensorflow/tfjs-models/tree/master/coco-ssd), running fully in-browser via TensorFlow.js — no server, no data leaves the device) detects common objects in the live video: people, chairs, cars, dogs, and 75+ other categories.
-4. The app announces detections out loud using the browser's built-in text-to-speech, including position (`left` / `ahead` / `right`) and proximity (`close` / `very close`) based on where the object's bounding box falls in frame.
-5. Tap again to stop.
+1. Choose a language — English, Hindi, or Kannada.
+2. Tap anywhere on the screen to start (the entire screen is one giant tap target — no fiddly buttons).
+3. The app asks for camera access and starts the rear camera.
+4. A pre-trained AI model ([COCO-SSD](https://github.com/tensorflow/tfjs-models/tree/master/coco-ssd), running fully in-browser via TensorFlow.js — no server, no data leaves the device) detects common objects in the live video: people, chairs, cars, dogs, and 75+ other categories.
+5. The app announces detections out loud, in the chosen language, using the browser's built-in text-to-speech — including position (left / ahead / right) and proximity (close / very close) based on where the object's bounding box falls in frame.
+6. Tap again to stop.
+
+## Language support
+
+Object names and spoken phrases are translated into English, Hindi, and Kannada (`translations.js`). The device's built-in text-to-speech voice for that language is used automatically. Adding another language is just a matter of adding a new translation block — no retraining or new models needed.
 
 ## Why these design choices
 
