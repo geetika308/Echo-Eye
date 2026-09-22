@@ -1,7 +1,7 @@
 // ===== Echo-Eye: Voice-guided object detection =====
-// This file handles: camera access, running the AI model,
-// figuring out object position, and speaking results out loud
-// in the user's chosen language.
+// Whole screen = one tap target, always. Language is chosen by
+// tapping repeatedly to cycle through options (announced out loud),
+// then it auto-starts after a short pause. No precise buttons anywhere.
 
 const appButton = document.getElementById('app-button');
 const video = document.getElementById('video');
@@ -12,20 +12,24 @@ const startOverlay = document.getElementById('start-overlay');
 const lastDetectionBox = document.getElementById('last-detection');
 const detectionText = document.getElementById('detection-text');
 const liveAnnouncer = document.getElementById('live-announcer');
-const langButtons = document.querySelectorAll('.lang-btn');
+
+const LANG_ORDER = ['en', 'hi']; // order languages cycle through on tap
 
 let model = null;
 let running = false;
 let lastSpokenAt = 0;
 let lastSpokenLabel = '';
-let currentLang = 'en'; // default language until the user picks one
-const SPEAK_COOLDOWN_MS = 2500; // don't repeat the same object too often
+let currentLang = 'en';
+let phase = 'choosingLanguage'; // 'choosingLanguage' -> 'running'
+let autoStartTimer = null;
+const SPEAK_COOLDOWN_MS = 2500;
+const AUTO_START_DELAY_MS = 3000; // how long to wait after last tap before auto-starting
 
 // ---- Speech ----
-function speak(text) {
+function speak(text, lang) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = TRANSLATIONS[currentLang].speechLang;
+  utterance.lang = TRANSLATIONS[lang || currentLang].speechLang;
   utterance.rate = 1.0;
   utterance.pitch = 1;
   window.speechSynthesis.speak(utterance);
@@ -35,28 +39,25 @@ function speak(text) {
   lastDetectionBox.classList.remove('hidden');
 }
 
-// ---- Position logic: left / center / right ----
+// ---- Position / proximity logic ----
 function getPosition(bbox, videoWidth) {
   const [x, , boxWidth] = bbox;
   const centerX = x + boxWidth / 2;
   const third = videoWidth / 3;
-
   if (centerX < third) return 'left';
   if (centerX > third * 2) return 'right';
   return 'ahead';
 }
 
-// ---- Distance/urgency logic: how big is the box relative to frame ----
 function getProximity(bbox, videoWidth, videoHeight) {
   const [, , boxWidth, boxHeight] = bbox;
   const areaRatio = (boxWidth * boxHeight) / (videoWidth * videoHeight);
-
   if (areaRatio > 0.35) return 'veryClose';
   if (areaRatio > 0.15) return 'close';
   return '';
 }
 
-// ---- Camera setup ----
+// ---- Camera ----
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: 'environment' },
@@ -73,7 +74,6 @@ async function startCamera() {
   });
 }
 
-// ---- Draw detection boxes (visual, helps sighted testers/developers) ----
 function drawDetections(predictions) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   predictions.forEach(pred => {
@@ -87,7 +87,7 @@ function drawDetections(predictions) {
   });
 }
 
-// ---- Main detection loop ----
+// ---- Detection loop ----
 async function detectFrame() {
   if (!running) return;
 
@@ -104,8 +104,7 @@ async function detectFrame() {
     const cooldownPassed = now - lastSpokenAt > SPEAK_COOLDOWN_MS;
 
     if (!sameAsLast || cooldownPassed) {
-      const phrase = buildPhrase(currentLang, best.class, position, proximity);
-      speak(phrase);
+      speak(buildPhrase(currentLang, best.class, position, proximity));
       lastSpokenAt = now;
       lastSpokenLabel = best.class;
     }
@@ -114,10 +113,9 @@ async function detectFrame() {
   requestAnimationFrame(detectFrame);
 }
 
-// ---- Start flow (triggered by tapping anywhere, after language is picked) ----
-async function start() {
-  if (running) return;
-
+// ---- Start detection (after language is confirmed) ----
+async function startDetection() {
+  phase = 'running';
   const t = TRANSLATIONS[currentLang].phrases;
   statusText.textContent = 'Starting camera...';
 
@@ -126,6 +124,7 @@ async function start() {
   } catch (err) {
     statusText.textContent = 'Camera access denied or unavailable.';
     speak(t.needCamera);
+    phase = 'choosingLanguage'; // let them try again
     return;
   }
 
@@ -144,36 +143,56 @@ async function start() {
   detectFrame();
 }
 
-function stop() {
-  const t = TRANSLATIONS[currentLang].phrases;
+function stopDetection() {
   running = false;
+  phase = 'choosingLanguage';
+  const t = TRANSLATIONS[currentLang].phrases;
   statusText.textContent = t.tapToStart;
   startOverlay.classList.remove('hidden');
   window.speechSynthesis.cancel();
   speak(t.stopped);
+
+  // Re-announce current language so they know where they're starting from
+  setTimeout(() => announceLanguage(), 1400);
+  scheduleAutoStart();
 }
 
-// ---- Language selection ----
-langButtons.forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation(); // don't let this tap also trigger the start button
-    currentLang = btn.dataset.lang;
+// ---- Language selection: tap cycles language, auto-starts after a pause ----
+function announceLanguage() {
+  speak(TRANSLATIONS[currentLang].langName, currentLang);
+  statusText.textContent = TRANSLATIONS[currentLang].langName;
+}
 
-    langButtons.forEach(b => b.classList.remove('lang-selected'));
-    btn.classList.add('lang-selected');
+function scheduleAutoStart() {
+  clearTimeout(autoStartTimer);
+  autoStartTimer = setTimeout(() => {
+    if (phase === 'choosingLanguage') {
+      startDetection();
+    }
+  }, AUTO_START_DELAY_MS);
+}
 
-    statusText.textContent = TRANSLATIONS[currentLang].phrases.tapToStart;
-    speak(TRANSLATIONS[currentLang].langName);
-  });
-});
+function cycleLanguage() {
+  const idx = LANG_ORDER.indexOf(currentLang);
+  currentLang = LANG_ORDER[(idx + 1) % LANG_ORDER.length];
+  announceLanguage();
+  scheduleAutoStart();
+}
 
-appButton.addEventListener('click', (e) => {
-  // Ignore taps that landed on a language button (handled above)
-  if (e.target.closest('.lang-btn')) return;
+// ---- Single tap handler for the whole screen ----
+let hasGreeted = false;
 
-  if (running) {
-    stop();
-  } else {
-    start();
+appButton.addEventListener('click', () => {
+  if (phase === 'choosingLanguage') {
+    if (!hasGreeted) {
+      hasGreeted = true;
+      speak('Echo Eye. Language: ' + TRANSLATIONS[currentLang].langName + '. Tap again to change. Wait to start.', currentLang);
+      statusText.textContent = TRANSLATIONS[currentLang].langName;
+      scheduleAutoStart();
+    } else {
+      cycleLanguage();
+    }
+  } else if (running) {
+    stopDetection();
   }
 });

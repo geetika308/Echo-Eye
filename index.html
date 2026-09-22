@@ -110,27 +110,7 @@
   }
 
   #lang-picker {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    width: 100%;
-    max-width: 320px;
-  }
-
-  .lang-btn {
-    font-size: 20px;
-    font-weight: 600;
-    padding: 16px;
-    border-radius: 12px;
-    border: 2px solid #444;
-    background: #111;
-    color: #fff;
-    cursor: pointer;
-  }
-
-  .lang-btn.lang-selected {
-    border-color: #00ff9d;
-    background: #003322;
+    display: none; /* no longer used - kept only so old cached CSS doesn't break */
   }
 
   .hidden { display: none !important; }
@@ -162,11 +142,7 @@
 
   <div id="start-overlay">
     <h1>Echo-Eye</h1>
-    <p>Choose a language, then tap anywhere<br/>to start voice-guided object detection.</p>
-    <div id="lang-picker">
-      <button class="lang-btn lang-selected" data-lang="en" aria-label="English">English</button>
-      <button class="lang-btn" data-lang="hi" aria-label="Hindi">हिन्दी (Hindi)</button>
-    </div>
+    <p>Tap anywhere to hear your language.<br/>Tap again to change it.<br/>Wait 3 seconds to start.</p>
   </div>
 
   <div id="live-announcer" class="sr-only" aria-live="assertive" role="status"></div>
