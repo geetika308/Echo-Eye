@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Echo-Eye - Voice Object Detection</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0a0a0a" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* The whole screen is one giant button - critical for accessibility */
+  #app-button {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    border: none;
+    background: #000;
+    cursor: pointer;
+    display: block;
+  }
+
+  #video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  #canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  #status-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 20px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent);
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  #status-text {
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  #last-detection {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 30px 20px;
+    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  #detection-text {
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  #start-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+    z-index: 20;
+  }
+
+  #start-overlay h1 {
+    font-size: 32px;
+    margin-bottom: 16px;
+  }
+
+  #start-overlay p {
+    font-size: 18px;
+    color: #ccc;
+    line-height: 1.5;
+    margin-bottom: 30px;
+  }
+
+  #lang-picker {
+    display: none; /* no longer used - kept only so old cached CSS doesn't break */
+  }
+
+  .hidden { display: none !important; }
+
+  /* Visually hidden but still read by screen readers */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+  }
+</style>
+</head>
+<body>
+
+<button id="app-button" aria-label="Tap anywhere to start object detection and voice guidance">
+
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+
+  <div id="status-bar">
+    <div id="status-text">Tap anywhere to start</div>
+  </div>
+
+  <div id="last-detection" class="hidden">
+    <div id="detection-text"></div>
+  </div>
+
+  <div id="start-overlay">
+    <h1>Echo-Eye</h1>
+    <p>Tap anywhere to hear your language.<br/>Tap again to change it.<br/>Wait 3 seconds to start.</p>
+  </div>
+
+  <div id="live-announcer" class="sr-only" aria-live="assertive" role="status"></div>
+
+</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="translations.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
