@@ -7,7 +7,7 @@ const TRANSLATIONS = {
     langName: 'English',
     speechLang: 'en-IN', // falls back to en-US if not available on device
     objects: {
-      person: 'person', bicycle: 'bicycle', car: 'car', motorcycle: 'motorcycle',
+      person: 'person', hand: 'hand', bicycle: 'bicycle', car: 'car', motorcycle: 'motorcycle',
       airplane: 'airplane', bus: 'bus', train: 'train', truck: 'truck', boat: 'boat',
       'traffic light': 'traffic light', 'fire hydrant': 'fire hydrant', 'stop sign': 'stop sign',
       'parking meter': 'parking meter', bench: 'bench', bird: 'bird', cat: 'cat', dog: 'dog',
@@ -44,7 +44,7 @@ const TRANSLATIONS = {
     langName: 'हिन्दी (Hindi)',
     speechLang: 'hi-IN',
     objects: {
-      person: 'व्यक्ति', bicycle: 'साइकिल', car: 'कार', motorcycle: 'मोटरसाइकिल',
+      person: 'व्यक्ति', hand: 'हाथ', bicycle: 'साइकिल', car: 'कार', motorcycle: 'मोटरसाइकिल',
       airplane: 'हवाई जहाज़', bus: 'बस', train: 'ट्रेन', truck: 'ट्रक', boat: 'नाव',
       'traffic light': 'ट्रैफिक लाइट', 'fire hydrant': 'फायर हाइड्रेंट', 'stop sign': 'स्टॉप साइन',
       'parking meter': 'पार्किंग मीटर', bench: 'बेंच', bird: 'पक्षी', cat: 'बिल्ली', dog: 'कुत्ता',
@@ -74,43 +74,6 @@ const TRANSLATIONS = {
       needCamera: 'इस ऐप को काम करने के लिए कैमरे की अनुमति चाहिए। कृपया अनुमति दें।',
       tapToStart: 'शुरू करने के लिए कहीं भी टैप करें',
       detectingTapToStop: 'पहचान जारी है - रोकने के लिए टैप करें'
-    }
-  },
-
-  kn: {
-    langName: 'ಕನ್ನಡ (Kannada)',
-    speechLang: 'kn-IN',
-    objects: {
-      person: 'ವ್ಯಕ್ತಿ', bicycle: 'ಸೈಕಲ್', car: 'ಕಾರು', motorcycle: 'ಮೋಟಾರ್‌ಸೈಕಲ್',
-      airplane: 'ವಿಮಾನ', bus: 'ಬಸ್', train: 'ರೈಲು', truck: 'ಟ್ರಕ್', boat: 'ದೋಣಿ',
-      'traffic light': 'ಟ್ರಾಫಿಕ್ ಲೈಟ್', 'fire hydrant': 'ಫೈರ್ ಹೈಡ್ರಂಟ್', 'stop sign': 'ನಿಲ್ಲಿಸಿ ಚಿಹ್ನೆ',
-      'parking meter': 'ಪಾರ್ಕಿಂಗ್ ಮೀಟರ್', bench: 'ಬೆಂಚ್', bird: 'ಹಕ್ಕಿ', cat: 'ಬೆಕ್ಕು', dog: 'ನಾಯಿ',
-      horse: 'ಕುದುರೆ', sheep: 'ಕುರಿ', cow: 'ಹಸು', elephant: 'ಆನೆ', bear: 'ಕರಡಿ',
-      zebra: 'ಜೀಬ್ರಾ', giraffe: 'ಜಿರಾಫೆ', backpack: 'ಬ್ಯಾಗ್', umbrella: 'ಛತ್ರಿ',
-      handbag: 'ಕೈಚೀಲ', tie: 'ಟೈ', suitcase: 'ಸೂಟ್‌ಕೇಸ್', frisbee: 'ಫ್ರಿಸ್ಬಿ', skis: 'ಸ್ಕೀ',
-      snowboard: 'ಸ್ನೋಬೋರ್ಡ್', 'sports ball': 'ಚೆಂಡು', kite: 'ಗಾಳಿಪಟ', 'baseball bat': 'ಬ್ಯಾಟ್',
-      'baseball glove': 'ಕೈಗವಸು', skateboard: 'ಸ್ಕೇಟ್‌ಬೋರ್ಡ್', surfboard: 'ಸರ್ಫ್‌ಬೋರ್ಡ್',
-      'tennis racket': 'ರಾಕೆಟ್', bottle: 'ಬಾಟಲಿ', 'wine glass': 'ಗ್ಲಾಸ್', cup: 'ಕಪ್',
-      fork: 'ಫೋರ್ಕ್', knife: 'ಚಾಕು', spoon: 'ಚಮಚ', bowl: 'ಬೌಲ್', banana: 'ಬಾಳೆಹಣ್ಣು',
-      apple: 'ಸೇಬು', sandwich: 'ಸ್ಯಾಂಡ್‌ವಿಚ್', orange: 'ಕಿತ್ತಳೆ', broccoli: 'ಬ್ರೊಕೊಲಿ',
-      carrot: 'ಕ್ಯಾರೆಟ್', 'hot dog': 'ಹಾಟ್ ಡಾಗ್', pizza: 'ಪಿಜ್ಜಾ', donut: 'ಡೋನಟ್', cake: 'ಕೇಕ್',
-      chair: 'ಕುರ್ಚಿ', couch: 'ಸೋಫಾ', 'potted plant': 'ಕುಂಡ ಗಿಡ', bed: 'ಹಾಸಿಗೆ',
-      'dining table': 'ಮೇಜು', toilet: 'ಶೌಚಾಲಯ', tv: 'ಟಿವಿ', laptop: 'ಲ್ಯಾಪ್‌ಟಾಪ್',
-      mouse: 'ಮೌಸ್', remote: 'ರಿಮೋಟ್', keyboard: 'ಕೀಬೋರ್ಡ್', 'cell phone': 'ಫೋನ್',
-      microwave: 'ಮೈಕ್ರೋವೇವ್', oven: 'ಓವನ್', toaster: 'ಟೋಸ್ಟರ್', sink: 'ಸಿಂಕ್',
-      refrigerator: 'ಫ್ರಿಜ್', book: 'ಪುಸ್ತಕ', clock: 'ಗಡಿಯಾರ', vase: 'ಹೂದಾನಿ',
-      scissors: 'ಕತ್ತರಿ', 'teddy bear': 'ಟೆಡ್ಡಿ ಬೇರ್', 'hair drier': 'ಹೇರ್ ಡ್ರೈಯರ್',
-      toothbrush: 'ಟೂತ್ ಬ್ರಷ್'
-    },
-    phrases: {
-      left: 'ನಿಮ್ಮ ಎಡಭಾಗದಲ್ಲಿ', right: 'ನಿಮ್ಮ ಬಲಭಾಗದಲ್ಲಿ', ahead: 'ಮುಂದೆ',
-      close: 'ಹತ್ತಿರದಲ್ಲಿ', veryClose: 'ತುಂಬಾ ಹತ್ತಿರದಲ್ಲಿ',
-      loading: 'ಲೋಡ್ ಆಗುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಕಾಯಿರಿ.',
-      ready: 'ಸಿದ್ಧ. ಪತ್ತೆ ಪ್ರಾರಂಭವಾಗಿದೆ.',
-      stopped: 'ಪತ್ತೆ ನಿಲ್ಲಿಸಲಾಗಿದೆ.',
-      needCamera: 'ಈ ಆ್ಯಪ್ ಕೆಲಸ ಮಾಡಲು ಕ್ಯಾಮೆರಾ ಅನುಮತಿ ಬೇಕು. ದಯವಿಟ್ಟು ಅನುಮತಿ ನೀಡಿ.',
-      tapToStart: 'ಪ್ರಾರಂಭಿಸಲು ಎಲ್ಲಿಯಾದರೂ ಟ್ಯಾಪ್ ಮಾಡಿ',
-      detectingTapToStop: 'ಪತ್ತೆ ನಡೆಯುತ್ತಿದೆ - ನಿಲ್ಲಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ'
     }
   }
 };
