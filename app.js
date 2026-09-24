@@ -212,8 +212,12 @@ function askForLanguage() {
     return;
   }
 
-  speak('Say one for English. Say two for Hindi.', 'en', () => {
-    listenForLanguageChoice();
+  // Say the English option in English, then the Hindi option in Hindi -
+  // so someone who only understands Hindi still knows what to say.
+  speak('Say one for English.', 'en', () => {
+    speak('हिंदी में सुनने के लिए दो कहें।', 'hi', () => {
+      listenForLanguageChoice();
+    });
   });
 }
 
@@ -239,9 +243,11 @@ function listenForLanguageChoice() {
       setLanguage('hi');
       speak('हिंदी चुनी गई।', 'hi', () => setTimeout(startDetection, 300));
     } else {
-      // Didn't understand - ask again
-      speak("Sorry, I didn't catch that. Say one for English, or two for Hindi.", 'en', () => {
-        listenForLanguageChoice();
+      // Didn't understand - ask again, same bilingual way
+      speak("Sorry, I didn't catch that. Say one for English.", 'en', () => {
+        speak('हिंदी के लिए दो कहें।', 'hi', () => {
+          listenForLanguageChoice();
+        });
       });
     }
   };

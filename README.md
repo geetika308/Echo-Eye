@@ -5,7 +5,7 @@ A browser-based, installable web app that helps visually impaired users understa
 ## How it works
 
 1. Tap anywhere on the screen to begin (the entire screen is one giant tap target — no fiddly buttons).
-2. The app asks: *"Say one for English. Say two for Hindi."* Speak your answer — the microphone picks it up and sets the language.
+2. The app asks (bilingually): *"Say one for English."* — then, in Hindi, *"हिंदी में सुनने के लिए दो कहें"* (say two for Hindi). Speak your answer — the microphone picks it up and sets the language.
 3. If voice recognition isn't supported on your device/browser, it falls back automatically to tap-anywhere-to-cycle between languages instead.
 4. The app asks for camera access and starts the rear camera.
 5. Two pre-trained AI models run fully in-browser via TensorFlow.js — no server, no data leaves the device: [COCO-SSD](https://github.com/tensorflow/tfjs-models/tree/master/coco-ssd) for general objects (people, chairs, cars, dogs, and 75+ other categories), and [Handpose](https://github.com/tensorflow/tfjs-models/tree/master/handpose) specifically for hands, so a hand isn't misread as "person."
