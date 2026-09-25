@@ -97,56 +97,66 @@ function drawDetections(predictions) {
 
 // ---- Detection loop ----
 const MIN_CONFIDENCE = 0.55; // only announce things the model is fairly sure about
+const HAND_CHECK_EVERY_N_FRAMES = 6; // hand model is heavy - don't run it every frame
+
+let frameCount = 0;
+let lastKnownHandBox = null; // { bbox, expiresAt }
+
+function boxesOverlap(a, b) {
+  // Simple overlap check (not true IoU, good enough for our purpose)
+  const [ax, ay, aw, ah] = a;
+  const [bx, by, bw, bh] = b;
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
 
 async function detectFrame() {
   if (!running) return;
+  frameCount++;
 
-  // Check for a hand first - COCO-SSD alone often mislabels a hand as "person"
-  const handPredictions = await handModel.estimateHands(video);
-
-  if (handPredictions.length > 0) {
-    const hand = handPredictions[0];
-    const { topLeft, bottomRight } = hand.boundingBox;
-    const bbox = [topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]];
-
-    drawDetections([{ bbox, class: 'hand' }]);
-
-    const position = getPosition(bbox, video.videoWidth);
-    const proximity = getProximity(bbox, video.videoWidth, video.videoHeight);
-
-    const now = Date.now();
-    const sameAsLast = 'hand' === lastSpokenLabel;
-    const cooldownPassed = now - lastSpokenAt > SPEAK_COOLDOWN_MS;
-
-    if (!sameAsLast || cooldownPassed) {
-      speak(buildPhrase(currentLang, 'hand', position, proximity));
-      lastSpokenAt = now;
-      lastSpokenLabel = 'hand';
+  // Only check for a hand every few frames - it's the expensive model,
+  // running it every single frame is what was causing the stutter.
+  if (frameCount % HAND_CHECK_EVERY_N_FRAMES === 0) {
+    const handPredictions = await handModel.estimateHands(video);
+    if (handPredictions.length > 0) {
+      const { topLeft, bottomRight } = handPredictions[0].boundingBox;
+      lastKnownHandBox = {
+        bbox: [topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]],
+        expiresAt: Date.now() + 1200 // treat as "still visible" for a short window
+      };
     }
-
-    requestAnimationFrame(detectFrame);
-    return;
+  }
+  if (lastKnownHandBox && Date.now() > lastKnownHandBox.expiresAt) {
+    lastKnownHandBox = null;
   }
 
-  // No hand in view - fall back to general object detection
+  // Normal object detection runs every frame - this is the main loop,
+  // so other nearby objects (chairs, people, etc.) still get announced.
   const predictions = await model.detect(video);
-  drawDetections(predictions);
-
   const confidentPredictions = predictions.filter(p => p.score >= MIN_CONFIDENCE);
 
+  drawDetections(confidentPredictions);
+
   if (confidentPredictions.length > 0) {
-    const best = confidentPredictions.reduce((a, b) => (a.score > b.score ? a : b));
+    let best = confidentPredictions.reduce((a, b) => (a.score > b.score ? a : b));
+    let announceClass = best.class;
+
+    // If the top guess is "person" and a hand is currently overlapping that
+    // same area, it's very likely actually a hand, not a whole person - fix the label.
+    if (best.class === 'person' && lastKnownHandBox && boxesOverlap(best.bbox, lastKnownHandBox.bbox)) {
+      announceClass = 'hand';
+    }
+
     const position = getPosition(best.bbox, video.videoWidth);
     const proximity = getProximity(best.bbox, video.videoWidth, video.videoHeight);
 
     const now = Date.now();
-    const sameAsLast = best.class === lastSpokenLabel;
+    const sameAsLast = announceClass === lastSpokenLabel;
     const cooldownPassed = now - lastSpokenAt > SPEAK_COOLDOWN_MS;
 
     if (!sameAsLast || cooldownPassed) {
-      speak(buildPhrase(currentLang, best.class, position, proximity));
+      speak(buildPhrase(currentLang, announceClass, position, proximity));
       lastSpokenAt = now;
-      lastSpokenLabel = best.class;
+      lastSpokenLabel = announceClass;
     }
   }
 
