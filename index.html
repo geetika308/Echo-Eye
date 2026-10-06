@@ -1,172 +1,159 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Echo-Eye - Voice Object Detection</title>
-<link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0a0a0a" />
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>Echo-Eye - Voice Object Detection</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
 
-  body {
-    background: #000;
-    color: #fff;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    overflow: hidden;
-    height: 100vh;
-    width: 100vw;
-  }
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* The whole screen is one giant button - critical for accessibility */
-  #app-button {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    border: none;
-    background: #000;
-    cursor: pointer;
-    display: block;
-  }
+    html, body {
+      height: 100%;
+      background: #0a0a0a;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif;
+      overflow: hidden;
+    }
 
-  #video {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+    .hidden { display: none !important; }
 
-  #canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
+    /* Camera + drawing layer */
+    #stage {
+      position: fixed;
+      inset: 0;
+      background: #000;
+    }
+    #video, #canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
 
-  #status-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    padding: 20px;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent);
-    text-align: center;
-    z-index: 10;
-    pointer-events: none;
-  }
+    /* Start screen text */
+    #start-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      background: #0a0a0a;
+      pointer-events: none;
+    }
+    #start-overlay h1 {
+      font-size: clamp(2.2rem, 9vw, 4rem);
+      color: #00ff9d;
+      margin-bottom: 20px;
+      letter-spacing: 1px;
+    }
+    #start-overlay p {
+      font-size: clamp(1.1rem, 4.5vw, 1.6rem);
+      line-height: 1.6;
+      margin: 4px 0;
+    }
 
-  #status-text {
-    font-size: 20px;
-    font-weight: 600;
-  }
+    /* Status line */
+    #status-text {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+      z-index: 3;
+      text-align: center;
+      font-size: 1.1rem;
+      color: #00ff9d;
+      padding: 0 16px;
+      pointer-events: none;
+    }
 
-  #last-detection {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 30px 20px;
-    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
-    text-align: center;
-    z-index: 10;
-    pointer-events: none;
-  }
+    /* Last spoken text */
+    #last-detection {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      top: calc(env(safe-area-inset-top, 0px) + 16px);
+      z-index: 3;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #00ff9d;
+      border-radius: 14px;
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 1.4rem;
+      pointer-events: none;
+    }
 
-  #detection-text {
-    font-size: 28px;
-    font-weight: 700;
-  }
+    /* Full-screen invisible tap button (always on top) */
+    #app-button {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #app-button:focus-visible {
+      outline: 4px solid #00ff9d;
+      outline-offset: -8px;
+    }
 
-  #start-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: #000;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 40px;
-    z-index: 20;
-  }
-
-  #start-overlay h1 {
-    font-size: 32px;
-    margin-bottom: 16px;
-  }
-
-  #start-overlay p {
-    font-size: 18px;
-    color: #ccc;
-    line-height: 1.5;
-    margin-bottom: 30px;
-  }
-
-  #lang-picker {
-    display: none; /* no longer used - kept only so old cached CSS doesn't break */
-  }
-
-  .hidden { display: none !important; }
-
-  /* Visually hidden but still read by screen readers */
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-  }
-</style>
+    /* Screen-reader only live region */
+    #live-announcer {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+  </style>
 </head>
 <body>
 
-<button id="app-button" aria-label="Tap anywhere to start object detection and voice guidance">
-
-  <video id="video" autoplay playsinline muted></video>
-  <canvas id="canvas"></canvas>
-
-  <div id="status-bar">
-    <div id="status-text">Tap anywhere to start</div>
+  <!-- Camera and detection boxes -->
+  <div id="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
   </div>
+
+  <!-- Start screen -->
+  <div id="start-overlay">
+    <h1>Echo-Eye</h1>
+    <p>Tap anywhere.</p>
+    <p>Say "English" for English.</p>
+    <p>हिंदी के लिए "हिंदी" कहें।</p>
+  </div>
+
+  <div id="status-text">Tap anywhere to start</div>
 
   <div id="last-detection" class="hidden">
-    <div id="detection-text"></div>
+    <span id="detection-text"></span>
   </div>
 
-  <div id="start-overlay">
-    <svg width="140" height="80" viewBox="0 0 380 220" role="img" aria-label="Echo-Eye logo" style="margin-bottom: 10px;">
-      <g stroke="#00ff9d" stroke-width="2.5" fill="none">
-        <path d="M110 110 Q190 60 270 110 Q190 160 110 110 Z"/>
-        <circle cx="190" cy="110" r="26" fill="#0a0a0a"/>
-        <circle cx="190" cy="110" r="26"/>
-        <circle cx="190" cy="110" r="10" fill="#00ff9d"/>
-      </g>
-      <g stroke="#00ff9d" stroke-width="2" fill="none" stroke-linecap="round">
-        <path d="M65 90 Q50 110 65 130"/>
-        <path d="M45 75 Q20 110 45 145"/>
-        <path d="M315 90 Q330 110 315 130"/>
-        <path d="M335 75 Q360 110 335 145"/>
-      </g>
-    </svg>
-    <h1>Echo-Eye</h1>
-    <p>Tap anywhere.<br/>"Say one" for English.<br/>हिंदी के लिए "दो" कहें।</p>
-  </div>
+  <div id="live-announcer" aria-live="polite" role="status"></div>
 
-  <div id="live-announcer" class="sr-only" aria-live="assertive" role="status"></div>
+  <!-- Tap anywhere -->
+  <button id="app-button" type="button" aria-label="Tap anywhere to start or stop. Say English or Hindi to choose language."></button>
 
-</button>
+  <!-- AI libraries (order matters) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
-<script src="translations.js"></script>
-<script src="app.js"></script>
+  <!-- Your files (translations must load before app) -->
+  <script src="translations.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
