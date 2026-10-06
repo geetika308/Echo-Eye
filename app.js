@@ -1,8 +1,8 @@
 // ===== Echo-Eye: Voice-guided object detection =====
-// Language is chosen IVR-style: app asks "say one for English, two for Hindi",
-// listens via microphone, picks the language you spoke.
-// If voice recognition isn't supported on this device/browser, it falls back
-// to tap-anywhere-to-cycle instead - so it never leaves anyone stuck.
+// Language is chosen by voice: app asks "Say English for English, हिंदी के लिए हिंदी कहें",
+// listens via microphone, and picks the language you spoke.
+// If voice recognition is not supported or keeps failing, it falls back to
+// tap-anywhere-to-cycle, so it never leaves anyone stuck.
 
 const appButton = document.getElementById('app-button');
 const video = document.getElementById('video');
@@ -26,6 +26,9 @@ let phase = 'choosingLanguage'; // 'choosingLanguage' -> 'running'
 let autoStartTimer = null;
 let recognition = null;
 let listening = false;
+let voiceFailCount = 0;
+let voiceFallbackActive = false;
+
 const SPEAK_COOLDOWN_MS = 2500;
 const AUTO_START_DELAY_MS = 3000;
 
@@ -36,15 +39,29 @@ const VOICE_INPUT_SUPPORTED = !!SpeechRecognitionAPI;
 function speak(text, lang, onDone) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = TRANSLATIONS[lang || currentLang].speechLang;
+  const speechLang = TRANSLATIONS[lang || currentLang].speechLang;
+  utterance.lang = speechLang;
   utterance.rate = 1.0;
   utterance.pitch = 1;
+
+  // Try to pick a matching installed voice (helps for Hindi)
+  const voices = window.speechSynthesis.getVoices();
+  const voice = voices.find(v => v.lang === speechLang) ||
+                voices.find(v => v.lang.startsWith(speechLang.slice(0, 2)));
+  if (voice) utterance.voice = voice;
+
   if (onDone) utterance.onend = onDone;
   window.speechSynthesis.speak(utterance);
 
   liveAnnouncer.textContent = text;
   detectionText.textContent = text;
   lastDetectionBox.classList.remove('hidden');
+}
+
+// Voices load late in some browsers - touch the list early
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 }
 
 // ---- Position / proximity logic ----
@@ -96,54 +113,63 @@ function drawDetections(predictions) {
 }
 
 // ---- Detection loop ----
-const MIN_CONFIDENCE = 0.55; // only announce things the model is fairly sure about
-const HAND_CHECK_EVERY_N_FRAMES = 6; // hand model is heavy - don't run it every frame
+const MIN_CONFIDENCE = 0.6; // only announce things the model is fairly sure about
+const HAND_CHECK_EVERY_N_FRAMES = 6; // hand model is heavy - do not run it every frame
 
 let frameCount = 0;
 let lastKnownHandBox = null; // { bbox, expiresAt }
 
-function boxesOverlap(a, b) {
-  // Simple overlap check (not true IoU, good enough for our purpose)
+// How much of box "a" is covered by box "b" (0 to 1)
+function overlapRatio(a, b) {
   const [ax, ay, aw, ah] = a;
   const [bx, by, bw, bh] = b;
-  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  const ix = Math.max(0, Math.min(ax + aw, bx + bw) - Math.max(ax, bx));
+  const iy = Math.max(0, Math.min(ay + ah, by + bh) - Math.max(ay, by));
+  const areaA = aw * ah;
+  return areaA > 0 ? (ix * iy) / areaA : 0;
 }
 
 async function detectFrame() {
   if (!running) return;
   frameCount++;
 
-  // Only check for a hand every few frames - it's the expensive model,
-  // running it every single frame is what was causing the stutter.
+  // Check for a hand only every few frames (expensive model)
   if (frameCount % HAND_CHECK_EVERY_N_FRAMES === 0) {
-    const handPredictions = await handModel.estimateHands(video);
-    if (handPredictions.length > 0) {
-      const { topLeft, bottomRight } = handPredictions[0].boundingBox;
-      lastKnownHandBox = {
-        bbox: [topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]],
-        expiresAt: Date.now() + 1200 // treat as "still visible" for a short window
-      };
+    try {
+      const handPredictions = await handModel.estimateHands(video);
+      if (handPredictions.length > 0) {
+        const { topLeft, bottomRight } = handPredictions[0].boundingBox;
+        lastKnownHandBox = {
+          bbox: [topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]],
+          expiresAt: Date.now() + 1200 // treat as "still visible" for a short window
+        };
+      }
+    } catch (e) {
+      // hand model hiccup - ignore, object detection still works
     }
   }
   if (lastKnownHandBox && Date.now() > lastKnownHandBox.expiresAt) {
     lastKnownHandBox = null;
   }
 
-  // Normal object detection runs every frame - this is the main loop,
-  // so other nearby objects (chairs, people, etc.) still get announced.
+  // Normal object detection runs every frame
   const predictions = await model.detect(video);
   const confidentPredictions = predictions.filter(p => p.score >= MIN_CONFIDENCE);
 
   drawDetections(confidentPredictions);
 
   if (confidentPredictions.length > 0) {
-    let best = confidentPredictions.reduce((a, b) => (a.score > b.score ? a : b));
+    const best = confidentPredictions.reduce((a, b) => (a.score > b.score ? a : b));
     let announceClass = best.class;
 
-    // If the top guess is "person" and a hand is currently overlapping that
-    // same area, it's very likely actually a hand, not a whole person - fix the label.
-    if (best.class === 'person' && lastKnownHandBox && boxesOverlap(best.bbox, lastKnownHandBox.bbox)) {
-      announceClass = 'hand';
+    // If top guess is "person" but the hand box covers most of that same area,
+    // it is very likely just a hand, not a whole person. (Stricter than before:
+    // a real person with a hand in frame will still be called "person".)
+    if (best.class === 'person' && lastKnownHandBox) {
+      const personBoxCoveredByHand = overlapRatio(best.bbox, lastKnownHandBox.bbox);
+      if (personBoxCoveredByHand > 0.6) {
+        announceClass = 'hand';
+      }
     }
 
     const position = getPosition(best.bbox, video.videoWidth);
@@ -166,6 +192,7 @@ async function detectFrame() {
 // ---- Start detection (after language is confirmed) ----
 async function startDetection() {
   if (recognition) { try { recognition.abort(); } catch (e) {} }
+  clearTimeout(autoStartTimer);
   phase = 'running';
   const t = TRANSLATIONS[currentLang].phrases;
   statusText.textContent = 'Starting camera...';
@@ -183,7 +210,8 @@ async function startDetection() {
   speak(t.loading);
 
   if (!model) {
-    model = await cocoSsd.load();
+    // mobilenet_v2 is more accurate than the default lite model (a bit slower)
+    model = await cocoSsd.load({ base: 'mobilenet_v2' });
   }
   if (!handModel) {
     handModel = await handpose.load();
@@ -200,6 +228,8 @@ async function startDetection() {
 function stopDetection() {
   running = false;
   phase = 'choosingLanguage';
+  voiceFailCount = 0;
+  voiceFallbackActive = false;
   const t = TRANSLATIONS[currentLang].phrases;
   statusText.textContent = t.tapToStart;
   startOverlay.classList.remove('hidden');
@@ -209,23 +239,33 @@ function stopDetection() {
   });
 }
 
-// ---- IVR-style voice language selection ----
+// ---- Voice language selection ----
 function setLanguage(lang) {
   currentLang = lang;
   statusText.textContent = TRANSLATIONS[currentLang].langName;
 }
 
+// Look at what was heard and decide the language (or null if unclear).
+// Uses simple "includes" instead of regex because \b does not work with Hindi letters.
+function detectLanguage(heard) {
+  const t = heard.toLowerCase().trim();
+  const hindiWords = ['hindi', 'hindee', 'hindhi', 'हिंदी', 'हिन्दी', 'हिंदि'];
+  const englishWords = ['english', 'inglish', 'इंग्लिश', 'अंग्रेजी', 'अंग्रेज़ी'];
+  if (hindiWords.some(w => t.includes(w))) return 'hi';
+  if (englishWords.some(w => t.includes(w))) return 'en';
+  return null;
+}
+
 function askForLanguage() {
   if (!VOICE_INPUT_SUPPORTED) {
-    // No mic recognition on this device/browser - fall back to tap-to-cycle
     announceLanguageTapFallback();
     return;
   }
 
-  // Say the English option in English, then the Hindi option in Hindi -
+  // English option in English, then Hindi option in Hindi,
   // so someone who only understands Hindi still knows what to say.
-  speak('Say one for English.', 'en', () => {
-    speak('हिंदी में सुनने के लिए दो कहें।', 'hi', () => {
+  speak('Say English for English.', 'en', () => {
+    speak('हिंदी के लिए, हिंदी कहें।', 'hi', () => {
       listenForLanguageChoice();
     });
   });
@@ -236,36 +276,53 @@ function listenForLanguageChoice() {
   listening = true;
 
   recognition = new SpeechRecognitionAPI();
-  recognition.lang = 'en-IN';
+  recognition.lang = 'en-IN'; // Indian English hears both "English" and "Hindi" well
   recognition.continuous = false;
   recognition.interimResults = false;
-  recognition.maxAlternatives = 3;
+  recognition.maxAlternatives = 5;
 
   recognition.onresult = (event) => {
     listening = false;
-    const heard = event.results[0][0].transcript.toLowerCase().trim();
-    statusText.textContent = 'Heard: ' + heard;
+    let chosen = null;
 
-    if (/\b(1|one|english)\b/.test(heard)) {
+    // Check every guess from the recognizer, not only the first one
+    for (let i = 0; i < event.results[0].length; i++) {
+      const heard = event.results[0][i].transcript;
+      statusText.textContent = 'Heard: ' + heard;
+      chosen = detectLanguage(heard);
+      if (chosen) break;
+    }
+
+    if (chosen === 'en') {
+      voiceFailCount = 0;
       setLanguage('en');
       speak('English selected.', 'en', () => setTimeout(startDetection, 300));
-    } else if (/\b(2|two|hindi|do)\b/.test(heard)) {
+    } else if (chosen === 'hi') {
+      voiceFailCount = 0;
       setLanguage('hi');
       speak('हिंदी चुनी गई।', 'hi', () => setTimeout(startDetection, 300));
     } else {
-      // Didn't understand - ask again, same bilingual way
-      speak("Sorry, I didn't catch that. Say one for English.", 'en', () => {
-        speak('हिंदी के लिए दो कहें।', 'hi', () => {
+      // Did not understand - ask again
+      speak("Sorry, I didn't catch that. Say English.", 'en', () => {
+        speak('या हिंदी कहें।', 'hi', () => {
           listenForLanguageChoice();
         });
       });
     }
   };
 
-  recognition.onerror = () => {
+  recognition.onerror = (e) => {
     listening = false;
-    // Mic blocked, no speech heard, or other error - fall back to tap-cycle
-    announceLanguageTapFallback();
+    if (e.error === 'aborted') return;          // we stopped it on purpose
+    if (phase !== 'choosingLanguage') return;
+
+    voiceFailCount++;
+    const blocked = e.error === 'not-allowed' || e.error === 'service-not-allowed';
+    if (blocked || voiceFailCount >= 3) {
+      announceLanguageTapFallback();            // give up on voice, use tap
+    } else {
+      setTimeout(askForLanguage, 500);          // no-speech etc: ask again
+    }
   };
 
   recognition.onend = () => {
@@ -282,10 +339,11 @@ function listenForLanguageChoice() {
 
 // ---- Fallback: tap-anywhere-to-cycle (used if voice recognition unavailable/fails) ----
 function announceLanguageTapFallback() {
+  voiceFallbackActive = true;
   speak(
-    'Voice selection is not available on this device. Tap anywhere to choose a language. Currently ' +
+    'Voice selection is not available. Tap anywhere to choose a language. Currently ' +
     TRANSLATIONS[currentLang].langName + '.',
-    currentLang
+    'en'
   );
   scheduleAutoStart();
 }
@@ -313,10 +371,9 @@ appButton.addEventListener('click', () => {
   if (phase === 'choosingLanguage') {
     if (!hasStarted) {
       hasStarted = true;
-      askForLanguage(); // first tap: unlocks audio + mic permission, begins the IVR prompt
-    } else if (!VOICE_INPUT_SUPPORTED || listening === false) {
-      // Only used as the fallback path when voice recognition isn't available
-      if (!VOICE_INPUT_SUPPORTED) cycleLanguageFallback();
+      askForLanguage(); // first tap: unlocks audio + mic permission, begins the prompt
+    } else if (!VOICE_INPUT_SUPPORTED || voiceFallbackActive) {
+      cycleLanguageFallback();
     }
   } else if (running) {
     stopDetection();
